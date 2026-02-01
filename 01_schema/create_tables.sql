@@ -1,3 +1,4 @@
+-- 01_schema/create_tables.sql
 -- ============================================
 -- UOC – Introduction to Databases
 -- Schema definition (DDL)

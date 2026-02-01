@@ -1,3 +1,4 @@
+-- 03_queries/joins.sql
 -- ============================================
 -- JOIN: reservations with customers
 -- Purpose: show reservation details with customer names
@@ -13,4 +14,3 @@ FROM reservations r
 JOIN customers c
   ON c.customer_id = r.customer_id
 ORDER BY r.start_at;
-
