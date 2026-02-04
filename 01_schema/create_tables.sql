@@ -4,11 +4,15 @@
 -- Schema definition (DDL)
 -- ============================================
 
--- Drop tables if they exist (safe reset)
+-- Drop tables (safe reset) — drop children first
+DROP TABLE IF EXISTS reservation_tables;
 DROP TABLE IF EXISTS reservations;
+DROP TABLE IF EXISTS tables;
 DROP TABLE IF EXISTS customers;
 
--- Customers table
+-- ============================================
+-- Customers
+-- ============================================
 CREATE TABLE customers (
   customer_id BIGSERIAL PRIMARY KEY,
   full_name   VARCHAR(100) NOT NULL,
@@ -16,7 +20,19 @@ CREATE TABLE customers (
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Reservations table
+-- ============================================
+-- Physical restaurant tables (configuration)
+-- ============================================
+CREATE TABLE tables (
+  table_id    BIGSERIAL PRIMARY KEY,
+  table_code  VARCHAR(10) NOT NULL UNIQUE,   -- e.g. T1, T2, TERR1
+  capacity    INT         NOT NULL CHECK (capacity > 0),
+  active      BOOLEAN     NOT NULL DEFAULT true
+);
+
+-- ============================================
+-- Reservations
+-- ============================================
 CREATE TABLE reservations (
   reservation_id BIGSERIAL PRIMARY KEY,
   customer_id    BIGINT NOT NULL,
@@ -27,4 +43,26 @@ CREATE TABLE reservations (
   CONSTRAINT fk_reservation_customer
     FOREIGN KEY (customer_id)
     REFERENCES customers (customer_id)
+);
+
+-- ============================================
+-- Reservation ↔ Tables (many-to-many)
+-- One reservation can use multiple tables.
+-- One table can be used by many reservations (at different times).
+-- ============================================
+CREATE TABLE reservation_tables (
+  reservation_id BIGINT NOT NULL,
+  table_id       BIGINT NOT NULL,
+
+  CONSTRAINT pk_reservation_tables
+    PRIMARY KEY (reservation_id, table_id),
+
+  CONSTRAINT fk_rt_reservation
+    FOREIGN KEY (reservation_id)
+    REFERENCES reservations (reservation_id)
+    ON DELETE CASCADE,
+
+  CONSTRAINT fk_rt_table
+    FOREIGN KEY (table_id)
+    REFERENCES tables (table_id)
 );
