@@ -1,184 +1,134 @@
-# UOC – Introduction to Databases (Preparation Workspace)
+# uoc-reservations-db
 
-This repository is a **personal preparation workspace** for the course **Introduction to Databases**  
-(BSc in Techniques for Software Application Development – UOC).
+Educational PostgreSQL database repository for the **UOC – Introduction to Databases** learning path.
 
-The goal of this repository is to **learn and internalize relational database concepts** through hands-on SQL practice, focusing on structure, integrity, and behavior rather than frameworks or tooling.
+This repo contains the **canonical schema (DDL)**, **sample seed data**, and a small set of **canonical JOIN queries** for a restaurant reservations domain.
 
-This is an **educational repository**, intentionally simple and incremental.
-
----
-
-## Learning objectives
-
-This workspace is used to practice and understand:
-
-- Relational schema design
-- Normalization and entity relationships
-- SQL Data Definition Language (DDL)
-- SQL Data Manipulation Language (DML)
-- JOIN queries and relational thinking
-- Transaction management (COMMIT / ROLLBACK)
-- Database internal behavior (sequences, autocommit)
-- ACID properties and concurrency (locking / blocking)
+The goal is to build a clean, realistic “backbone” database that a Java JDBC application can use and evolve step by step.
 
 ---
 
-## Domain model used for practice
+## What this repository includes
 
-To make the exercises concrete and realistic, the database models a **simple restaurant reservation system**.
+### Schema (DDL)
+Location: `01_schema/create_tables.sql`
 
-The domain includes:
+Tables:
 
-- Customers
-- Reservations (time-based)
-- Physical restaurant tables (capacity, availability)
-- A many-to-many relationship between reservations and tables
+- `customers`
+  - `customer_id` (PK)
+  - `full_name` (required)
+  - `phone` (required, unique)
+  - `email` (optional, unique)
+  - `created_at` (default now)
 
-Business rules such as availability checks, overlapping reservations, or capacity validation are **intentionally not implemented yet**, as they are introduced progressively later in the learning process.
+- `tables` (physical restaurant tables / configuration)
+  - `table_id` (PK)
+  - `table_code` (required, unique) — e.g. `T1`, `T2`, `TERR1`
+  - `capacity` (required, > 0)
+  - `active` (default true)
 
----
+- `reservations`
+  - `reservation_id` (PK)
+  - `customer_id` (FK → `customers.customer_id`)
+  - `start_at` (required)
+  - `end_at` (optional; if present must be > `start_at`)
+  - `party_size` (required, > 0)
+  - `status` (default `PENDING`, constrained to allowed values)
+  - `notes` (optional)
+  - `created_at` (default now)
 
-## Folder structure
-
-### 01_schema/
-
-Contains **schema definition scripts (DDL)**.
-
-- Table creation
-- Primary keys and foreign keys
-- CHECK, NOT NULL, and UNIQUE constraints
-- Physical restaurant tables configuration
-- Many-to-many relationship between reservations and tables
-
-### 02_data/
-
-Contains **sample data insertion scripts**.
-
-- INSERT statements for testing
-- Data used to validate queries and constraints
-
-### 03_queries/
-
-Contains **read-only queries**.
-
-- SELECT statements
-- JOIN queries
-- Queries useful for revision and exams
-
-### 04_transactions/
-
-Contains scripts related to **database behavior and transactions**.
-
-- Manual transactions
-- COMMIT vs ROLLBACK
-- Sequence behavior
-- Autocommit demonstrations
-- Concurrency behavior (blocking / locks)
+- `reservation_tables` (junction table; many-to-many)
+  - `(reservation_id, table_id)` composite PK
+  - `reservation_id` (FK → `reservations.reservation_id`, `ON DELETE CASCADE`)
+  - `table_id` (FK → `tables.table_id`)
 
 ---
 
-## How to run (psql)
+## Relationship overview
 
-Connect to the database:
+- One `customer` can have many `reservations`
+- One `reservation` belongs to exactly one `customer`
+- One `reservation` can be assigned to many physical `tables`
+- One physical `table` can be assigned to many `reservations` (at different times)
 
-- `\c uoc_databases`
-
-Create or reset the schema:
-
-- `\i 'C:/Users/Usuario/dev/uoc_databases/01_schema/create_tables.sql'`
-
-Insert sample data:
-
-- `\i 'C:/Users/Usuario/dev/uoc_databases/02_data/insert_sample_data.sql'`
-
-Run queries:
-
-- `\i 'C:/Users/Usuario/dev/uoc_databases/03_queries/basic_selects.sql'`
-- `\i 'C:/Users/Usuario/dev/uoc_databases/03_queries/joins.sql'`
-
-Run transaction demonstrations:
-
-- `\i 'C:/Users/Usuario/dev/uoc_databases/04_transactions/commit_rollback.sql'`
-- `\i 'C:/Users/Usuario/dev/uoc_databases/04_transactions/sequences.sql'`
-
-**Windows tip:**  
-In `psql`, prefer forward slashes (`/`) instead of backslashes in file paths.
+`reservation_tables` exists to support:
+- combined tables (e.g. large parties)
+- flexible allocation decisions
+- future availability logic
 
 ---
 
-## Checking database state (psql)
+## Seed data (development)
 
-List tables:
+Location: `02_data/insert_sample_data.sql`
 
-- `\dt`
+The seed is designed to be:
+- easy to read
+- safe to rerun (idempotent patterns for config + assignments)
+- aligned with the schema constraints (phone required, status constrained, etc.)
 
-Describe table structure (columns and constraints):
-
-- `\d customers`
-- `\d reservations`
-- `\d tables`
-- `\d reservation_tables`
-
-Quick metadata checks (SQL):
-
-- `SELECT current_database();`
-- `SELECT current_user;`
-
-Quick data checks (SQL):
-
-- `SELECT customer_id, full_name FROM customers ORDER BY customer_id;`
-- `SELECT reservation_id, customer_id, start_at, party_size, status FROM reservations ORDER BY reservation_id;`
+Typical seed flow (in order):
+1. insert physical restaurant tables (`tables`)
+2. insert customers (`customers`)
+3. insert reservations (`reservations`)
+4. assign tables to reservations (`reservation_tables`)
 
 ---
 
-## ACID and transaction management (key concepts)
+## Canonical queries
 
-During this preparation, several transaction scenarios were tested to understand why databases use transactions and what guarantees they provide.
+Location: `03_queries/`
 
-### Atomicity
+This repo includes “canonical” JOIN queries that return one row per reservation, enriched with:
+- customer details
+- time window (start/end)
+- assigned table codes (aggregated)
+- optional computed fields (e.g. allocated capacity)
 
-A transaction is executed as an all-or-nothing unit.  
-If any statement fails, the entire transaction is aborted and all previous changes are rolled back.
-
-Observed when:
-
-- Multiple UPDATE statements were executed inside a transaction
-- One statement failed due to a constraint violation
-- PostgreSQL marked the transaction as aborted and required a ROLLBACK
-
-### Consistency
-
-Transactions preserve database integrity constraints.  
-After a transaction completes, the database remains in a valid state.
-
-Examples in this repository:
-
-- NOT NULL constraints prevent invalid updates
-- CHECK constraints avoid invalid values
-- Foreign keys enforce referential integrity
-
-### Isolation
-
-Concurrent transactions are isolated from each other.  
-Changes made by one transaction are not visible to others until committed.
-
-Observed when:
-
-- Session A updated a row (locking it)
-- Session B attempted to update the same row and was blocked
-- Session B continued only after Session A COMMITted or ROLLBACKed
-
-### Durability
-
-Once a transaction is committed, its changes persist permanently.  
-Committed data remains available even after system failures or restarts.
+These queries are intended as:
+- learning examples for JOINs and aggregation
+- a stable “read model” foundation for a CLI, UI, or API later
 
 ---
 
-## Notes
+## What is intentionally NOT implemented yet
 
-- SQL scripts are written to be executed using either `psql` or DBeaver
-- DBeaver typically uses auto-commit by default
-- `psql` is more suitable for learning explicit transaction control
-- This workspace is intentionally framework-free and focused on fundamentals
+This is a backbone repo. It focuses on structure and correctness, not “full restaurant rules”.
+
+Examples of deferred logic (to be implemented in application/service layer later):
+- preventing overlapping reservations on the same table
+- capacity optimization (“best table combination”)
+- availability search
+- automatic table assignment
+- cancellation policies and auditing beyond `created_at`
+
+---
+
+## How to use
+
+### 1) Create schema
+Run `01_schema/create_tables.sql` in your SQL client.
+
+### 2) Insert sample data
+Run `02_data/insert_sample_data.sql`.
+
+### 3) Explore queries
+Run the files under `03_queries/`.
+
+---
+
+## Notes on design choices
+
+- `status` uses a CHECK constraint to avoid typos and invalid values.
+- `end_at` is optional to keep early inserts simple; if present, it must be after `start_at`.
+- The DB stores “facts” (what was assigned), while “decision rules” (how to assign) are handled later in the application.
+
+---
+
+## Companion project
+
+This database repo is intended to be used by a separate Java JDBC backend project (IntelliJ/Gradle), where:
+- DAOs map rows to domain models
+- services orchestrate transactions
+- a CLI (or later API/UI) exercises end-to-end flows
