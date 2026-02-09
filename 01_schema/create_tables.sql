@@ -78,3 +78,10 @@ CREATE TABLE reservation_tables (
     REFERENCES tables (table_id)
 );
 
+-- ============================================
+-- F3 — Reservation cancellation audit fields
+-- ============================================
+
+ALTER TABLE reservations
+ADD COLUMN cancelled_at TIMESTAMPTZ,
+ADD COLUMN cancellation_reason TEXT;
